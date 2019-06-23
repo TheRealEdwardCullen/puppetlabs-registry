@@ -40,6 +40,7 @@ Puppet::Type.type(:registry_value).provide(:registry) do
             FFI::MemoryPointer::NULL, FFI::MemoryPointer::NULL)
 
           found = status == 0
+          Puppet.debug((found ? "Found" : "Didn't find") + " registry value: #{self}")
           raise Win32::Registry::Error.new(status) if !found
         end
       end
@@ -97,15 +98,18 @@ Puppet::Type.type(:registry_value).provide(:registry) do
       @regvalue = {}
       hive.open(subkey, Win32::Registry::KEY_READ | access) do |reg|
         FFI::Pointer.from_string_to_wide_string(valuename) do |valuename_ptr|
-          if Puppet::Util::Windows::Registry.RegQueryValueExW(reg.hkey, valuename_ptr,
-            FFI::MemoryPointer::NULL, FFI::MemoryPointer::NULL,
-            FFI::MemoryPointer::NULL, FFI::MemoryPointer::NULL) == 0
-            contents = ''
+          type_ptr = FFI::MemoryPointer.new(:uint32)
+          if Puppet::Util::Windows::Registry.RegQueryValueExW(
+            reg.hkey, valuename_ptr,
+            FFI::MemoryPointer::NULL, type_ptr,
+            FFI::MemoryPointer::NULL, FFI::MemoryPointer::NULL
+          ) == 0
+            contents = [type_ptr.read(:uint32), nil]
             begin
               # Note - This actually calls read from Win32::Registry not Puppet::Util::Windows::Registry
               contents = reg.read(valuename)
             rescue Encoding::InvalidByteSequenceError => e
-              Puppet.log_exception(e, "#{e} when reading registry value for '#{valuename}'")
+              Puppet.log_exception(e, "#{self}: #{e} when reading registry value")
             end
             @regvalue[:type], @regvalue[:data] = from_native(contents)
           end

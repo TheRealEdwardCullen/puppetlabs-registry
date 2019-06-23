@@ -100,11 +100,11 @@ describe Puppet::Type.type(:registry_value).provider(:registry) do
       data.should eq ['01']
     end
 
-    xit "should gracefully handle corrupt registry values" do
+    it "should gracefully handle corrupt registry values" do
       reg = described_class.new 
       broken_encoding = [0xd800].pack('U')
       type, data = reg.from_native([3, broken_encoding])  
-      data.should eql ['']
+      data.should eql [3, nil]
     end
 
 
